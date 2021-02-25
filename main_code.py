@@ -29,35 +29,21 @@ def solve_cp(dataset, max_time = None):
         cur_xs = []
         x = model.NewIntVar(0, 1, name='start'+str(i))
         cur_xs.append(x)
-        go_to_ends = []
         for s in car:
-            go_to_end_1 = model.NewBoolVar(name="go to end 1"+str(i)+s)
-            go_to_end_2 = model.NewBoolVar(name="go to end 2"+str(i)+s)
-            go_to_end_3 = model.NewBoolVar(name="go to end 3"+str(i)+s)
             y = model.NewIntVar(0,100*dataset.D, name='stop'+str(i)+' '+s)
-            model.Add(y >= cur_xs[-1] + dataset.street_to_intersections[s][2]).OnlyEnforceIf(go_to_end_1)
-            model.Add(y < cur_xs[-1] + dataset.street_to_intersections[s][2]).OnlyEnforceIf(go_to_end_1.Not())
+            model.Add(y >= cur_xs[-1] + dataset.street_to_intersections[s][2])
             street_end = dataset.street_to_intersections[s][1]
             depart_mod = model.NewIntVar(0,dataset.D, name='depart-mod'+str(i)+' '+s)
             model.AddModuloEquality(depart_mod,y, cycle_duration[street_end])
-            model.Add( interval_starts[s] <= depart_mod ).OnlyEnforceIf(go_to_end_2)
-            model.Add( interval_starts[s] > depart_mod).OnlyEnforceIf(go_to_end_2.Not())
-            model.Add( depart_mod < interval_ends[s]).OnlyEnforceIf(go_to_end_3)
-            model.Add( depart_mod >= interval_ends[s]).OnlyEnforceIf(go_to_end_3.Not())
-            go_to_ends.append(go_to_end_1.Not())
-            go_to_ends.append(go_to_end_2.Not())
-            go_to_ends.append(go_to_end_3.Not())
+            model.Add( interval_starts[s] <= depart_mod < intervals_starts[s])
             cur_xs.append(y)
         arrived_in_time = model.NewBoolVar(name='arrived '+str(i))
         model.Add(cur_xs[-1] <= dataset.D-1).OnlyEnforceIf(arrived_in_time)
         model.Add(cur_xs[-1] > dataset.D-1).OnlyEnforceIf(arrived_in_time.Not())
         score = model.NewIntVar(0, 1000**3, name='score '+str(i))
         add_to_score = model.NewBoolVar(name="add_to_score"+str(i))
-        go_to_ends.append(arrived_in_time.Not())
-        go_to_ends.append(add_to_score)
-        model.AddBoolOr(go_to_ends)
-        model.Add(score ==  F + dataset.D - 1 - cur_xs[-1]).OnlyEnforceIf(add_to_score)
-        model.Add(score == 0).OnlyEnforceIf(add_to_score.Not())
+        model.Add(score ==  F + dataset.D - 1 - cur_xs[-1]).OnlyEnforceIf(arrived_in_time)
+        model.Add(score == 0).OnlyEnforceIf(arrived_in_time.Not())
         scores.append(score)
         xs.append(cur_xs)
     model.Maximize(sum(scores))
@@ -92,3 +78,4 @@ def solve_cp(dataset, max_time = None):
         res[n] = s
     print(res)
     return res
+
